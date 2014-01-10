@@ -1,0 +1,276 @@
+<!-- http://bl.ocks.org/mbostock/3886208 -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.bar {
+  fill: steelblue;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.axis text {
+    font-family: nunito;
+    font-size: 11px;
+}
+
+</style>
+<body>
+  <div>
+    <button type = 'button' id = 'freq'>Check-ins</button>
+    <button type = 'button' id = 'survival'>Prevention Opportunity</button>
+  </div>
+
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+
+var margin = {top: 20, right: 20, bottom: 80, left: 60},
+    width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var x = d3.scale.ordinal()
+    .rangeRoundBands([0, width], .1);
+
+var y = d3.scale.linear()
+    .rangeRound([height, 0]);
+
+// var color = d3.scale.ordinal()
+//     .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+
+
+var color = d3.scale.ordinal()
+    .range(["#114370", "#178BE2", "#5FBEF2", "#9FD8F7", "#D7DCDD"]);
+
+    
+
+var scaled = d3.format(".0%")
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .tickFormat(scaled);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("/data/dhs_histogram_data.csv", function(error, data) {
+  color.domain(d3.keys(data[0]).filter(function(key) { return key !== "months"; }));
+
+  data.forEach(function(d) {
+    var y0 = 0;
+    d.boroughs = color.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+    d.total = d.boroughs[d.boroughs.length - 1].y1;
+    //console.log(d.boroughs)
+  });
+
+  // data.sort(function(a, b) { return b.total - a.total; });
+
+  x.domain(data.map(function(d) { return d.months; }));
+  y.domain([0, d3.max(data, function(d) { return d.total; })]);
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+
+  xlabel = svg.append("text")
+    .attr("class", "x label")
+    .attr("text-anchor", "end")
+    .attr("font-family",'nunito')
+    .attr("font-size", "12px")
+    .attr("x", width)
+    .attr("y", height + margin.bottom / 2)
+    .text("Number of months after eviction filing");
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+
+  ylabel = svg.append("text")
+              .attr("class","y label")
+              .attr("transform", "rotate(-90)")
+              .attr("y", 6)
+              .attr("font-size", "12px")
+              .attr("font-family",'nunito')
+              .attr("dy", ".81em")
+              .style("text-anchor", "end")
+              .text("Percentage of families");
+
+  //Months
+  var months = svg.selectAll(".months")
+      .data(data)
+    .enter()
+      .append("g")
+      .attr("class", "bar")
+      .attr("transform", function(d) { return "translate(" + x(d.months) + ",0)"; });
+
+  //Rects
+  months.selectAll("rect")
+      .data(function(d) { return d.boroughs; })
+    .enter().append("rect")
+      .attr("width", x.rangeBand())
+      .attr("y", function(d) { return y(d.y1); })
+      .attr("height", function(d) { return y(d.y0) - y(d.y1); })
+      .style("fill", function(d) { return color(d.name); });
+
+
+
+  //Legend
+  var legend = svg.selectAll(".legend")
+      .data(color.domain().slice().reverse())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+  legend.append("rect") 
+      .attr("x", width - 18)
+      .attr("width", 18)
+      .attr("height", 18)
+      .style("fill", color);
+
+  legend.append("text")
+      .attr("x", width - 24)
+      .attr("y", 9)
+      .attr("dy", ".35em")
+      .style("text-anchor", "end")
+      .attr("font-family",'nunito')
+      .text(function(d) { return d; });
+
+});
+
+      
+
+//Update
+d3.selectAll('button').
+        on('click', function(){
+
+
+var buttonID = d3.select(this).attr("id");
+
+if (buttonID == 'survival'){
+  //Y-Axis Shift
+var y = d3.scale.linear()
+  .rangeRound([height, 0])
+  //.domain([0, d3.max(data, function(d) { return d.total; })]);
+  .domain([0,1])
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .tickFormat(scaled);
+
+svg.select(".y.axis")
+  .transition()
+  .duration(1000)
+  .call(yAxis)
+
+// //Y-Label
+// ylabel
+//   .transition()
+//   .duration(300)
+//   .text('Survival Rate');
+
+
+    //Load Data
+    d3.csv("/data/dhs_survival_data.csv", function(error, data) {
+    color.domain(d3.keys(data[0]).filter(function(key) { return key !== "months"; }));
+
+    data.forEach(function(d) {
+    var y0 = 0;
+    d.boroughs = color.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+    d.total = d.boroughs[d.boroughs.length - 1].y1;
+    });
+    console.log(data)
+    //Transition
+      var newd = d3.selectAll('.bar')
+                .data(data)
+                .selectAll('rect')
+                .data(function(d) { return d.boroughs; })
+                .transition()
+                .duration(1000)
+                //.attr("y", function(d) { return height - y(d.y0); })
+                //.attr("height", function(d) { return y(d.y0) - y(d.y1); }) 
+                .attr("y", function(d) { return y(d.y1); })
+                .attr("height", function(d) { return y(d.y0) - y(d.y1); })  
+      });
+} else {
+
+
+    //Load Data
+    d3.csv("/data/dhs_histogram_data.csv", function(error, data) {
+    color.domain(d3.keys(data[0]).filter(function(key) { return key !== "months"; }));
+
+    data.forEach(function(d) {
+    var y0 = 0;
+    d.boroughs = color.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+    d.total = d.boroughs[d.boroughs.length - 1].y1;
+    //console.log(d.boroughs)
+    });
+
+    console.log(data)
+
+      var y = d3.scale.linear()
+        .rangeRound([height, 0])
+        .domain([0, d3.max(data, function(d) { return d.total; })]);
+
+
+      var yAxis = d3.svg.axis()
+          .scale(y)
+          .orient("left")
+          .tickFormat(scaled);
+
+      svg.select(".y.axis")
+        .transition()
+        .duration(1000)
+        .call(yAxis)
+
+      // //Y-Label
+      // ylabel
+      //   .transition()
+      //   .duration(300)
+      //   .text('Percentage');
+
+
+    //Transition
+      var newd = d3.selectAll('.bar')
+                .data(data)
+                .selectAll('rect')
+                .data(function(d) { return d.boroughs; })
+                .transition()
+                .duration(1000)
+                //.attr("y", function(d) { return height - y(d.y0); })
+                //.attr("height", function(d) { return y(d.y0) - y(d.y1); }) 
+              .attr("y", function(d) { return y(d.y1); })
+              .attr("height", function(d) { return y(d.y0) - y(d.y1); })
+
+    
+      });
+
+}
+
+
+
+});
+
+</script>
