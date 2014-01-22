@@ -239,8 +239,13 @@ def reentries_shelter(data,start):
 	return(reentry)
 
 
+
+
+
+##########SHAPELY ######
 #Find where the point belongs
 from shapely.geometry import Point, Polygon, MultiPolygon, shape, LinearRing
+import pandas as pd
 
 
 #GeoJSON
@@ -248,6 +253,8 @@ with open('boroughs.geojson') as f: boroughs = json.loads(f.read())
 #Extract the coordinates. feature keys: [u'type', u'coordinates']
 boroughs_polygons = [shape(feature['geometry']) for feature in boroughs['features'] ]
 
+#Shelter Data
+body = pd.read_csv('body.csv')
 #Lon-Lat's
 lonlat = body[['entry_lon','entry_lat']]
 match =[]
