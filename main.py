@@ -1,5 +1,15 @@
 
 
+dbparams = {'db': 'evictions',
+ 'host': 'projects.cwkjvkbpph6y.us-east-1.rds.amazonaws.com',
+ 'index': 'nid',
+ 'passwd': 'ShYbjS70anhCnXpV',
+ 'port': 3306,
+ 'query': 'SELECT id, FAMILY_ID_rcd, CASE_NUMBER_rcd, CARES_ID_rcd from Entrants_Exits;',
+ 'user': 'admin'}
+
+
+
 
 from pandas import DataFrame, Series
 import MySQLdb
@@ -60,6 +70,14 @@ evictions_with_warrants  = evictions.dropna(subset='warr-type')
 	    graph.write_pdf('abalone.pdf')
 
 
+###Visualization
+#Concataneta exitadds2 and entry location tables together. Note to myself: There are duplicates in the exitadds2 table. 
+data_sub = data[['FAMILY_ID_rcd','entry_lat','entry_lon','exit_lat','exit_lon','UNITBED_START_DT','UNITBED_END_DT','GENDER','RACE','ETHNICITY','HOMELESSNESS_PRIMARY_REASON','PRIOR_ZIP','EXIT_ZIP']]
+#Remove missing lat/lon's.
+
+
+# data = pd.read_csv('data.csv')
+
 #Duration of the Stay
 def duration_stay(data):
 	from dateutil import parser
@@ -87,7 +105,7 @@ def duration_stay(data):
 			duration.append((e-s).days)
 		except:
 			duration.append(nan)
-	data['duration'] = duration
+	data['DURATION'] = duration
 	return(data)
 
 
@@ -144,15 +162,34 @@ def transition_convert(data):
 	# transition['exit_lat'] = transition['exit_lat'].map(lambda k: round(k,3))
 	#Swtich Lat Lon
 	transition.columns = [u'entry_lat', u'entry_lon', u'exit_lon', u'exit_lat',u'size']
-	#Sample for illustration
-	#transition = transition.reindex(np.random.permutation(transition.index))[:2000]
 	return(transition)
 
-#Stacked Bar - Borough and Days Stayed
-#Borough is derived from lat&lon's
-def borough_and_months_group(data,survival=False):
+
+
+#Sample for illustration
+data = transition.reindex(np.random.permutation(transition.index))[:2000]
+
+
+
+
+###D3 Visualizations
+
+#Histogram
+import numpy as np
+import pandas as pd
+df= pd.read_csv('cartodb_evic_shelter.csv')
+rng = range(0,max(df.days_diff)+100,30)
+count,division = np.histogram(df.days_diff,bins=rng)
+count = count/sum(count)
+
+h = pd.DataFrame([pd.Series(count),pd.Series(division)]).T.dropna()
+h.columns = ['freq','bins']
+h.to_csv('dhs_histogram_data.csv',index=None,sep='\t')
+
+#Stacked Bar - Borough and Month
+def borough_and_months_group(data):
 	#Month
-	data['months'] = data['duration'].map(lambda k: int(k/30))
+	data['months'] = data.days_diff.map(lambda k: int(k/30))
 	#Grouped DF
 	gdf = data.groupby(['months','borough']).size().reset_index()
 	gdf.columns = ['months','group','value']
@@ -164,9 +201,8 @@ def borough_and_months_group(data,survival=False):
 	gdf = gdf/gdf.sum().sum()
 	gdf.to_csv('dhs_histogram_data.csv')
 	#Survival
-	if survival:
-		survival = gdf.cumsum().ix[51,:] - gdf.cumsum()
-		survival.to_csv('dhs_survival_data.csv')
+	survival = gdf.cumsum().ix[51,:] - gdf.cumsum()
+	survival.to_csv('dhs_survival_data.csv')
 	return(gdf)
 
 
@@ -206,28 +242,16 @@ def reentries_shelter(data,start):
 
 
 
-##########SHAPELY #############
+##########SHAPELY ######
 #Find where the point belongs
-from shapely.geometry import Point, Polygon, MultiPolygon, asShape, shape, LinearRing
-from shapely import speedups
-
-import json
-
+from shapely.geometry import Point, Polygon, MultiPolygon, shape, LinearRing
 import pandas as pd
-#Enable performance enhancements written in C
-speedups.enable()
 
-#Look into to speed up the performance
-#http://stackoverflow.com/questions/20297977/looking-for-a-fast-way-to-find-the-polygon-a-point-belongs-to-using-shapely
 
-#Approach Explained here 
-#http://www.mhermans.net/geojson-shapely-geocoding.html
 #GeoJSON
 with open('boroughs.geojson') as f: boroughs = json.loads(f.read())
 #Extract the coordinates. feature keys: [u'type', u'coordinates']
-#Type is a shapely geom object: Point, Line, Polygon, MultiPolygon etc. 
 boroughs_polygons = [shape(feature['geometry']) for feature in boroughs['features'] ]
-
 
 #Shelter Data
 body = pd.read_csv('body.csv')
@@ -244,9 +268,6 @@ for k,line in lonlat.iterrows():
 				break
 	except:
 		print k 
-
-#Join borough codes
-
 
 
 		
